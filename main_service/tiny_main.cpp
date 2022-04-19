@@ -34,21 +34,21 @@ private:
 
 };
 
-struct job
+struct WorkerThread
 {
-  thread jobThread;
-  mutex jobMutex;
-}
+  thread worker;
+  mutex lock_key;
+};
 
-job jobs[JOB_NUM];
+WorkerThread worker_thread_list[JOB_NUM];
 
 int count = 0;
 
 template<typename T>
-struct MyStruct
+struct SharedData
 {
-  MyStruct(T* param) : data(param) {}
-  ~MyStruct() { delete data; }
+  SharedData(T* param) : data(param) {}
+  ~SharedData() { delete data; }
   void setData(T* param) {data=param;}
   T* getData() {return data;}
 
@@ -56,15 +56,15 @@ struct MyStruct
     T* data;
 };
 
-//MyStruct<char*> td2(nullptr);
-MyStruct<void*> td2(nullptr);
+//SharedData<char*> td2(nullptr);
+SharedData<void*> td2(nullptr);
 
 void runMainWorkerTask1(int worker)
 {
   while(1)
   {
-    jobs[worker].jobMutext.lock();
-    // do some job
+    worker_thread_list[worker].lock_key.lock();
+    // TODO
     cout << "[Main Task 1]\t working... COUNT:" << count++ <<endl;
     usleep(1000);
   }
@@ -74,8 +74,9 @@ void runSubWorkerTask1(int worker)
 {
   while(1)
   {
-    jobs[worker].jobMutext.lock();
-    // do some job
+    worker_thread_list[worker].lock_key.lock();
+
+    // TODO
     cout << "[Sub Task 1]\t working... COUNT:" << count++ <<endl;
 
     char data_org[64] = "<Sensor>Turn On</Sensor>";
@@ -91,14 +92,15 @@ void runSubWorkerTask2(int worker)
 {
   while(1)
   {
-    jobs[worker].jobMutext.lock();
-    // do some job
+    worker_thread_list[worker].lock_key.lock();
+
+    // TODO
     cout << "[Sub Task 2]\t working... COUNT:" << count++ <<endl;
 
     auto output = td2.getData();
     if (output != nullptr)
     {
-      out << "[Sub Task 2]\t working... GET:" << (char*)output[0] <<endl;
+      cout << "[Sub Task 2]\t working... GET:" << (char*)output[0] <<endl;
     }
 
     usleep(1000);
@@ -108,13 +110,13 @@ void runSubWorkerTask2(int worker)
 int TinyPlatform::initialize()
 {
   int i;
-  for (i=0;i<BASE_TASK_NUM;i++)
+  for (i=0; i < BASE_TASK_NUM; i++)
   {
-    jobs[i].jobThread = thread(runMainWorkerTask1, i);
+    worker_thread_list[i].worker = thread(runMainWorkerTask1, i);
   }
 
-  jobs[i].jobThread = thread(runSubWorkerTask1, i++);
-  jobs[i].jobThread = thread(runSubWorkerTask2, i++);
+  worker_thread_list[i].worker = thread(runSubWorkerTask1, i++);
+  worker_thread_list[i].worker = thread(runSubWorkerTask2, i++);
 
   cout << "i=" << i << endl;
 
@@ -123,19 +125,18 @@ int TinyPlatform::initialize()
 
 int TinyPlatform::start()
 {
-  int bufferSize = 0;
+  int buffer_size = 0;
 
   while(1)
   {
-    bufferSize = JOB_NUM;
-    if (bufferSize==JOB_NUM)
+    buffer_size = JOB_NUM;
+    if (buffer_size == JOB_NUM)
     {
-      for(int i=0;i<JOB_NUM;i++)
+      for(int i=0; i < JOB_NUM; i++)
       {
-        jobs[i].jobMutex.unlock();
+        worker_thread_list[i].lock_key.unlock();
       }
     }
-    //break;
   }
   return 1;
 }
@@ -143,7 +144,7 @@ int TinyPlatform::start()
 int main()
 {
     cout << "################################" << endl;
-    cout << "Start Tiny Platform            ." << endl;
+    cout << "Start Tiny Platform             " << endl;
     cout << "################################" << endl;
 
     TinyPlatform tiny;
